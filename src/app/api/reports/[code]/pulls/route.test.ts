@@ -87,7 +87,7 @@ describe("GET /api/reports/[code]/pulls", () => {
     expect(body).toMatchObject({ fightId: 6, zoneId: 2859, countRequired: 100 });
     expect(body.players).toEqual([
       { name: "Tank", classId: 1, profileUrl: "https://raider.io/characters/eu/tarren-mill/Tank",
-        specIcon: "https://assets.rpglogs.com/img/warcraft/icons/DeathKnight-Blood.jpg",
+        specIcon: "/icons/DeathKnight-Blood.jpg",
       },
     ]);
     expect(body.pulls[0].deaths).toMatchObject([{ name: "Tank", timeLost: 15000 }]);

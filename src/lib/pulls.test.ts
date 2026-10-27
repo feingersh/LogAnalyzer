@@ -146,13 +146,10 @@ describe("group and deaths", () => {
       [4, "Hunter-BeastMastery"],
     ]);
     expect(specsFromPlayerDetails(null).size).toBe(0);
-    expect(specIconUrl("Priest-Holy")).toBe("https://assets.rpglogs.com/img/warcraft/icons/Priest-Holy.jpg");
+    expect(specIconUrl("Priest-Holy")).toBe("/icons/Priest-Holy.jpg");
 
     const route = toDungeonRoute(fight(pulls), actors, [{ ...players[0], spec: "DeathKnight-Blood" }, players[1]]);
-    expect(route.players.map((p) => p.specIcon)).toEqual([
-      "https://assets.rpglogs.com/img/warcraft/icons/DeathKnight-Blood.jpg",
-      null,
-    ]);
+    expect(route.players.map((p) => p.specIcon)).toEqual(["/icons/DeathKnight-Blood.jpg", null]);
   });
 
   it("resolves WarcraftLogs realm names to Raider.IO slugs", () => {

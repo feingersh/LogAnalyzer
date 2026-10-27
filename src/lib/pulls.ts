@@ -92,7 +92,7 @@ export function specsFromPlayerDetails(json: unknown): Map<number, string> {
 }
 
 export function specIconUrl(spec: string): string {
-  return `https://assets.rpglogs.com/img/warcraft/icons/${encodeURIComponent(spec)}.jpg`;
+  return `/icons/${encodeURIComponent(spec)}.jpg`;
 }
 
 export interface RawDeath {
