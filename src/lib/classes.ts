@@ -24,6 +24,12 @@ export function classColor(classId: number | null | undefined): string | undefin
   return CLASSES.find((c) => c.id === classId)?.color;
 }
 
+/** WarcraftLogs class id for an actor `subType` such as "DeathKnight" (case and spacing are ignored). */
+export function classIdFromName(name: string | null | undefined): number | null {
+  const key = name?.replace(/[^a-z]/gi, "").toLowerCase();
+  return CLASSES.find((c) => c.slug.replace(/-/g, "") === key)?.id ?? null;
+}
+
 /** WarcraftLogs class id for a kebab-case class name such as "death-knight", or null if unknown. */
 export function classIdFromSlug(slug: string | null | undefined): number | null {
   return CLASSES.find((c) => c.slug === slug)?.id ?? null;

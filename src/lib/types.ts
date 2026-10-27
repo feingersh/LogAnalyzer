@@ -45,6 +45,8 @@ export interface ReportEncounter {
   fightPercentage: number | null;
   keystoneLevel: number | null;
   keystoneTime: number | null;
+  /** Timer the key had to beat, in milliseconds, when the dungeon is known. */
+  keystoneLimit: number | null;
 }
 
 export interface PullEnemy {
@@ -53,6 +55,27 @@ export interface PullEnemy {
   count: number;
   /** Enemy forces these mobs add to the key (count x per-mob value). */
   forces: number;
+}
+
+export interface RoutePlayer {
+  name: string;
+  classId: number | null;
+}
+
+export interface GroupMember extends RoutePlayer {
+  /** Raider.IO profile, or null when the realm is unknown. */
+  profileUrl: string | null;
+  /** Spec icon image, or null when the spec is unknown. */
+  specIcon: string | null;
+}
+
+export interface PullDeath extends RoutePlayer {
+  /** Milliseconds into the run. */
+  time: number;
+  /** Milliseconds this death adds to the run. */
+  penalty: number;
+  /** Total time lost to deaths in the run so far, including this one. */
+  timeLost: number;
 }
 
 export interface DungeonPull {
@@ -69,10 +92,15 @@ export interface DungeonPull {
   boundingBox: { minX: number; maxX: number; minY: number; maxY: number } | null;
   enemies: PullEnemy[];
   forces: number;
+  deaths: PullDeath[];
+  /** Pull start/end in milliseconds from the start of the report, for linking to WarcraftLogs. */
+  reportStart: number;
+  reportEnd: number;
 }
 
 export interface DungeonRoute {
   fightId: number;
+  players: GroupMember[];
   zoneId: number | null;
   dungeon: string;
   keystoneLevel: number | null;

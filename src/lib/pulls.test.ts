@@ -1,4 +1,4 @@
-import { toDungeonRoute, type RawKeystoneFight, type RawPull } from "./pulls";
+import { raiderIoUrl, resolveRealmSlug, specIconUrl, specsFromPlayerDetails, toDungeonRoute, wclPullUrl, type RawKeystoneFight, type RawPull } from "./pulls";
 import { fitBounds, findDungeonMap, toMapFraction } from "./dungeon-maps";
 
 const box = { minX: 0, maxX: 10, minY: 0, maxY: 10 };
@@ -29,9 +29,16 @@ function fight(pulls: RawPull[]): RawKeystoneFight {
     countReached: 105,
     npcCountMap: { "10": 5, "20": 1 },
     gameZone: { id: 2859 },
+    friendlyPlayers: [1, 2],
     dungeonPulls: pulls,
   };
 }
+
+const players = [
+  { id: 1, name: "Tank", subType: "DeathKnight", server: "tarren-mill" },
+  { id: 2, name: "Healer", subType: "Priest", server: "area-52" },
+  { id: 3, name: "Bystander", subType: "Mage", server: null },
+];
 
 const actors = [
   { gameID: 10, name: "Big Mob" },
@@ -97,6 +104,99 @@ describe("toDungeonRoute", () => {
     const route = toDungeonRoute({ ...fight([]), dungeonPulls: null, npcCountMap: null }, []);
 
     expect(route.pulls).toEqual([]);
+  });
+});
+
+describe("group and deaths", () => {
+  const pulls = [pull({ id: 1, startTime: 1000, endTime: 3000 }), pull({ id: 2, startTime: 5000, endTime: 7000 })];
+
+  it("lists only the players in the run, with their class", () => {
+    const route = toDungeonRoute(fight(pulls), actors, players);
+
+    expect(route.players.map(({ name, classId }) => ({ name, classId }))).toEqual([
+      { name: "Tank", classId: 1 },
+      { name: "Healer", classId: 7 },
+    ]);
+  });
+
+  it("links each player to Raider.IO on their own realm", () => {
+    const route = toDungeonRoute(fight(pulls), actors, players, [], "EU");
+
+    expect(route.players.map((p) => p.profileUrl)).toEqual([
+      "https://raider.io/characters/eu/tarren-mill/Tank",
+      "https://raider.io/characters/eu/area-52/Healer",
+    ]);
+    expect(toDungeonRoute(fight(pulls), actors, players).players[0].profileUrl).toBeNull();
+  });
+
+  it("reads spec icon keys from playerDetails and builds icon urls", () => {
+    const specs = specsFromPlayerDetails({
+      data: {
+        playerDetails: {
+          tanks: [{ id: 1, icon: "DeathKnight-Blood" }],
+          healers: [{ id: 2, type: "Priest", specs: [{ spec: "Holy" }] }],
+          dps: [{ id: 4, type: "Hunter", specs: [{ spec: "Beast Mastery" }] }, { id: 5 }],
+        },
+      },
+    });
+
+    expect([...specs]).toEqual([
+      [1, "DeathKnight-Blood"],
+      [2, "Priest-Holy"],
+      [4, "Hunter-BeastMastery"],
+    ]);
+    expect(specsFromPlayerDetails(null).size).toBe(0);
+    expect(specIconUrl("Priest-Holy")).toBe("https://assets.rpglogs.com/img/warcraft/icons/Priest-Holy.jpg");
+
+    const route = toDungeonRoute(fight(pulls), actors, [{ ...players[0], spec: "DeathKnight-Blood" }, players[1]]);
+    expect(route.players.map((p) => p.specIcon)).toEqual([
+      "https://assets.rpglogs.com/img/warcraft/icons/DeathKnight-Blood.jpg",
+      null,
+    ]);
+  });
+
+  it("resolves WarcraftLogs realm names to Raider.IO slugs", () => {
+    const known = [
+      { name: "Tarren Mill", slug: "tarren-mill" },
+      { name: "Area 52", slug: "area-52" },
+    ];
+
+    expect(resolveRealmSlug("TarrenMill", known)).toBe("tarren-mill");
+    expect(resolveRealmSlug("Area52", known)).toBe("area-52");
+    expect(resolveRealmSlug("Quel'Thalas", [])).toBe("quelthalas");
+    expect(resolveRealmSlug("Burning Blade", [])).toBe("burning-blade");
+    expect(raiderIoUrl("US", "area-52", "Zoë")).toBe("https://raider.io/characters/us/area-52/Zo%C3%AB");
+  });
+
+  it("assigns deaths to pulls and accumulates 15s per death from +12", () => {
+    const route = toDungeonRoute(fight(pulls), actors, players, [
+      { timestamp: 6000, targetID: 2 },
+      { timestamp: 2000, targetID: 1 },
+      { timestamp: 2500, targetID: 3 }, // not in the run
+    ]);
+
+    expect(route.pulls[0].deaths).toEqual([
+      { name: "Tank", classId: 1, time: 1000, penalty: 15000, timeLost: 15000 },
+    ]);
+    expect(route.pulls[1].deaths).toMatchObject([{ name: "Healer", timeLost: 30000 }]);
+  });
+
+  it("charges 5s per death below +12 and attributes deaths between pulls to the pull before", () => {
+    const route = toDungeonRoute({ ...fight(pulls), keystoneLevel: 11 }, actors, players, [
+      { timestamp: 4000, targetID: 1 },
+    ]);
+
+    expect(route.pulls[0].deaths).toMatchObject([{ penalty: 5000, timeLost: 5000 }]);
+    expect(route.pulls[1].deaths).toEqual([]);
+  });
+
+  it("keeps report-relative pull times for linking", () => {
+    const route = toDungeonRoute(fight(pulls), actors);
+
+    expect(route.pulls[0]).toMatchObject({ reportStart: 1000, reportEnd: 3000 });
+    expect(wclPullUrl("abc", 6, 1000, 3000)).toBe(
+      "https://www.warcraftlogs.com/reports/abc?fight=6&type=damage-done&start=1000&end=3000",
+    );
   });
 });
 

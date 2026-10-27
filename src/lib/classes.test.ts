@@ -1,4 +1,4 @@
-import { classColor, classIdFromSlug } from "./classes";
+import { classColor, classIdFromName, classIdFromSlug } from "./classes";
 
 describe("classIdFromSlug", () => {
   it("translates class names to WarcraftLogs ids", () => {
@@ -10,6 +10,19 @@ describe("classIdFromSlug", () => {
   it("returns null for unknown or missing names", () => {
     expect(classIdFromSlug("jedi")).toBeNull();
     expect(classIdFromSlug(undefined)).toBeNull();
+  });
+});
+
+describe("classIdFromName", () => {
+  it("translates actor subTypes to WarcraftLogs ids", () => {
+    expect(classIdFromName("DeathKnight")).toBe(1);
+    expect(classIdFromName("DemonHunter")).toBe(12);
+    expect(classIdFromName("Priest")).toBe(7);
+  });
+
+  it("returns null for unknown or missing names", () => {
+    expect(classIdFromName("Pet")).toBeNull();
+    expect(classIdFromName(null)).toBeNull();
   });
 });
 

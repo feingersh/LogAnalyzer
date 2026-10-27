@@ -7,32 +7,52 @@ import type { ReportDetail, ReportEncounter, ReportSummary } from "@/lib/types";
 
 function EncounterRow({ code, encounter }: { code: string; encounter: ReportEncounter }) {
   const [routeOpen, setRouteOpen] = useState(false);
+  // A key's official time includes death penalties, so prefer it to the length of the fight.
+  const official = encounter.keystoneLevel && encounter.keystoneTime ? encounter.keystoneTime : null;
   const details = [
     encounter.keystoneLevel ? `+${encounter.keystoneLevel}` : difficultyName(encounter.difficulty),
-    formatDuration(encounter.endTime - encounter.startTime),
+    formatDuration(official ?? encounter.endTime - encounter.startTime),
   ].filter(Boolean);
-  // Routes are only offered for completed Mythic+ runs for now.
-  const hasRoute = encounter.kill === true && !!encounter.keystoneLevel;
+  // Negative is time to spare (timed), positive is time over (depleted).
+  const split = official !== null && encounter.keystoneLimit ? official - encounter.keystoneLimit : null;
+  // Routes are offered for every Mythic+ run, including depleted and abandoned ones.
+  const hasRoute = !!encounter.keystoneLevel;
+
+  const content = (
+    <>
+      <span className={encounter.kill ? "encounter-kill" : "encounter-wipe"}>
+        {encounter.kill ? "Kill" : "Wipe"}
+      </span>
+      <span className="encounter-name">{encounter.name}</span>
+      <span className="encounter-meta">
+        {details.join(" · ")}
+        {split !== null && (
+          <span className={split <= 0 ? "split-under" : "split-over"}>
+            {" "}
+            ({split <= 0 ? "−" : "+"}
+            {formatDuration(Math.abs(split))})
+          </span>
+        )}
+      </span>
+      {hasRoute && <span className="route-toggle">{routeOpen ? "Hide route" : "Route"}</span>}
+    </>
+  );
 
   return (
     <li>
-      <div className="encounter">
-        <span className={encounter.kill ? "encounter-kill" : "encounter-wipe"}>
-          {encounter.kill ? "Kill" : "Wipe"}
-        </span>
-        <span className="encounter-name">{encounter.name}</span>
-        <span className="encounter-meta">{details.join(" · ")}</span>
-        {hasRoute && (
-          <button
-            type="button"
-            className="route-toggle"
-            aria-expanded={routeOpen}
-            onClick={() => setRouteOpen((open) => !open)}
-          >
-            {routeOpen ? "Hide route" : "Route"}
-          </button>
-        )}
-      </div>
+      {hasRoute ? (
+        // The whole row is the toggle, not just the "Route" label.
+        <button
+          type="button"
+          className="encounter encounter-link"
+          aria-expanded={routeOpen}
+          onClick={() => setRouteOpen((open) => !open)}
+        >
+          {content}
+        </button>
+      ) : (
+        <div className="encounter">{content}</div>
+      )}
       {routeOpen && <DungeonRoute code={code} fightId={encounter.id} />}
     </li>
   );
