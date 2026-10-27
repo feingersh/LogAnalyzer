@@ -67,7 +67,11 @@ export interface GroupMember extends RoutePlayer {
   profileUrl: string | null;
   /** Spec icon image, or null when the spec is unknown. */
   specIcon: string | null;
+  /** Role derived from the spec, or null when the spec is unknown. */
+  role: Role | null;
 }
+
+export type Role = "tank" | "healer" | "dps";
 
 export interface PullDeath extends RoutePlayer {
   /** Milliseconds into the run. */

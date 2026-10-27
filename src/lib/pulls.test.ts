@@ -1,4 +1,4 @@
-import { raiderIoUrl, resolveRealmSlug, specIconUrl, specsFromPlayerDetails, toDungeonRoute, wclPullUrl, type RawKeystoneFight, type RawPull } from "./pulls";
+import { raiderIoUrl, resolveRealmSlug, specIconUrl, specRole, specsFromPlayerDetails, toDungeonRoute, wclPullUrl, type RawKeystoneFight, type RawPull } from "./pulls";
 import { fitBounds, findDungeonMap, toMapFraction } from "./dungeon-maps";
 
 const box = { minX: 0, maxX: 10, minY: 0, maxY: 10 };
@@ -129,6 +129,15 @@ describe("group and deaths", () => {
     expect(toDungeonRoute(fight(pulls), actors, players).players[0].profileUrl).toBeNull();
   });
 
+  it("maps specs to tank, healer or dps", () => {
+    expect(["DeathKnight-Blood", "Druid-Guardian", "Warrior-Protection", "Paladin-Protection", "DemonHunter-Vengeance", "Monk-Brewmaster"].map(specRole))
+      .toEqual(Array(6).fill("tank"));
+    expect(["Priest-Holy", "Paladin-Holy", "Shaman-Restoration", "Druid-Restoration", "Evoker-Preservation", "Monk-Mistweaver"].map(specRole))
+      .toEqual(Array(6).fill("healer"));
+    expect(["Priest-Shadow", "Paladin-Retribution", "Druid-Balance", "Monk-Windwalker"].map(specRole))
+      .toEqual(Array(4).fill("dps"));
+  });
+
   it("reads spec icon keys from playerDetails and builds icon urls", () => {
     const specs = specsFromPlayerDetails({
       data: {
@@ -150,6 +159,7 @@ describe("group and deaths", () => {
 
     const route = toDungeonRoute(fight(pulls), actors, [{ ...players[0], spec: "DeathKnight-Blood" }, players[1]]);
     expect(route.players.map((p) => p.specIcon)).toEqual(["/icons/DeathKnight-Blood.jpg", null]);
+    expect(route.players.map((p) => p.role)).toEqual(["tank", null]);
   });
 
   it("resolves WarcraftLogs realm names to Raider.IO slugs", () => {

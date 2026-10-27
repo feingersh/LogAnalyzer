@@ -120,6 +120,10 @@ export default function DungeonRoute({ code, fightId }: { code: string; fightId:
             ) : (
               <span style={{ color: classColor(pl.classId) }}>{pl.name}</span>
             )}
+            {pl.role && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img className="role-icon" src={`/icons/${pl.role}.webp`} alt={pl.role} title={pl.role} />
+            )}
           </li>
         ))}
       </ul>

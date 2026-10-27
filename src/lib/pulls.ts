@@ -1,5 +1,5 @@
 import { classIdFromName } from "./classes";
-import type { DungeonPull, DungeonRoute, PullEnemy } from "./types";
+import type { DungeonPull, DungeonRoute, PullEnemy, Role } from "./types";
 
 const realmKey = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
 
@@ -93,6 +93,30 @@ export function specsFromPlayerDetails(json: unknown): Map<number, string> {
 
 export function specIconUrl(spec: string): string {
   return `/icons/${encodeURIComponent(spec)}.jpg`;
+}
+
+const TANK_SPECS = new Set([
+  "DeathKnight-Blood",
+  "Druid-Guardian",
+  "Warrior-Protection",
+  "Paladin-Protection",
+  "DemonHunter-Vengeance",
+  "Monk-Brewmaster",
+]);
+const HEALER_SPECS = new Set([
+  "Priest-Holy",
+  "Paladin-Holy",
+  "Shaman-Restoration",
+  "Druid-Restoration",
+  "Evoker-Preservation",
+  "Monk-Mistweaver",
+]);
+
+/** Role for a spec icon key (e.g. "Priest-Holy"); every spec that is not a tank or healer is dps. */
+export function specRole(spec: string): Role {
+  if (TANK_SPECS.has(spec)) return "tank";
+  if (HEALER_SPECS.has(spec)) return "healer";
+  return "dps";
 }
 
 export interface RawDeath {
@@ -192,6 +216,7 @@ export function toDungeonRoute(
       ...byId.get(p.id)!,
       profileUrl: region && p.server ? raiderIoUrl(region, p.server, p.name) : null,
       specIcon: p.spec ? specIconUrl(p.spec) : null,
+      role: p.spec ? specRole(p.spec) : null,
     })),
     zoneId: fight.gameZone?.id ?? null,
     dungeon: fight.name,
