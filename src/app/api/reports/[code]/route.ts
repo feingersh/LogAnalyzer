@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { dungeonKey, fetchDungeonTimers } from "@/lib/dungeon-timers";
 import { REPORT_CODE_PATTERN } from "@/lib/report-code";
 import { wclQuery } from "@/lib/wcl";
 import type { ReportDetail, ReportEncounter } from "@/lib/types";
@@ -29,7 +30,7 @@ interface ReportData {
   reportData: {
     report: {
       title: string;
-      fights: (Omit<ReportEncounter, "encounterId"> & { encounterID: number })[] | null;
+      fights: (Omit<ReportEncounter, "encounterId" | "keystoneLimit"> & { encounterID: number })[] | null;
     } | null;
   };
 }
@@ -46,12 +47,15 @@ export async function GET(_request: Request, ctx: { params: Promise<{ code: stri
     if (!report) {
       return NextResponse.json({ error: `Report "${code}" not found.` }, { status: 404 });
     }
+    const fights = report.fights ?? [];
+    const timers = fights.some((f) => f.keystoneLevel) ? await fetchDungeonTimers().catch(() => null) : null;
     const result: ReportDetail = {
       code,
       title: report.title,
-      encounters: (report.fights ?? []).map(({ encounterID, ...fight }) => ({
+      encounters: fights.map(({ encounterID, ...fight }) => ({
         ...fight,
         encounterId: encounterID,
+        keystoneLimit: fight.keystoneLevel ? (timers?.get(dungeonKey(fight.name)) ?? null) : null,
       })),
     };
     return NextResponse.json(result);

@@ -2,6 +2,10 @@ import { GET } from "./route";
 import { wclQuery } from "@/lib/wcl";
 
 jest.mock("@/lib/wcl");
+jest.mock("@/lib/dungeon-timers", () => ({
+  ...jest.requireActual("@/lib/dungeon-timers"),
+  fetchDungeonTimers: jest.fn(async () => new Map([["arakara", 1800000]])),
+}));
 const wclQueryMock = jest.mocked(wclQuery);
 
 function get(code: string) {
@@ -72,7 +76,8 @@ describe("GET /api/reports/[code]", () => {
     expect(body.encounters).toHaveLength(2);
     expect(body.encounters[0]).toMatchObject({ id: 3, encounterId: 2902, name: "Ulgrax", kill: true });
     expect(body.encounters[0]).not.toHaveProperty("encounterID");
-    expect(body.encounters[1]).toMatchObject({ keystoneLevel: 12, keystoneTime: 1500000 });
+    expect(body.encounters[1]).toMatchObject({ keystoneLevel: 12, keystoneTime: 1500000, keystoneLimit: 1800000 });
+    expect(body.encounters[0].keystoneLimit).toBeNull();
   });
 
   it("returns an empty list when the report has no fights", async () => {

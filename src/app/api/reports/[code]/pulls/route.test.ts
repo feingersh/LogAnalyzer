@@ -31,13 +31,20 @@ describe("GET /api/reports/[code]/pulls", () => {
   });
 
   it("returns the normalized route with NPC names", async () => {
-    wclQueryMock.mockResolvedValue({
+    wclQueryMock.mockResolvedValueOnce({
       reportData: {
         report: {
-          masterData: { actors: [{ gameID: 10, name: "Big Mob" }] },
+          region: { slug: "EU" },
+          playerDetails: { data: { playerDetails: { tanks: [{ id: 1, icon: "DeathKnight-Blood" }] } } },
+          masterData: {
+            actors: [{ gameID: 10, name: "Big Mob" }],
+            players: [{ id: 1, name: "Tank", subType: "DeathKnight", server: "TarrenMill" }],
+          },
+          deaths: { data: [{ timestamp: 2500, targetID: 1 }] },
           fights: [
             {
               id: 6,
+              friendlyPlayers: [1],
               name: "The Blinding Vale",
               keystoneLevel: 17,
               startTime: 1000,
@@ -65,17 +72,33 @@ describe("GET /api/reports/[code]/pulls", () => {
       },
     });
 
+    wclQueryMock.mockResolvedValueOnce({
+      worldData: {
+        region: {
+          servers: { has_more_pages: false, data: [{ name: "Tarren Mill", slug: "tarren-mill" }] },
+        },
+      },
+    });
+
     const res = await get(CODE, "6");
 
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toMatchObject({ fightId: 6, zoneId: 2859, countRequired: 100 });
+    expect(body.players).toEqual([
+      { name: "Tank", classId: 1, profileUrl: "https://raider.io/characters/eu/tarren-mill/Tank",
+        specIcon: "https://assets.rpglogs.com/img/warcraft/icons/DeathKnight-Blood.jpg",
+      },
+    ]);
+    expect(body.pulls[0].deaths).toMatchObject([{ name: "Tank", timeLost: 15000 }]);
     expect(body.pulls[0]).toMatchObject({
       startTime: 1000,
       mapId: 2500,
       forces: 15,
       enemies: [{ name: "Big Mob", count: 3, forces: 15 }],
     });
+    // The mock can't validate GraphQL enums, so pin the one WarcraftLogs rejected before ("Friendly").
+    expect(wclQueryMock.mock.calls[0][0]).toContain("hostilityType: Friendlies");
     expect(wclQueryMock).toHaveBeenCalledWith(expect.any(String), { code: CODE, fight: 6 }, 300);
   });
 

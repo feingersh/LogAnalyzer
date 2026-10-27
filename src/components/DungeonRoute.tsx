@@ -2,7 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { fitBounds, findDungeonMap, toMapFraction, type DungeonMap } from "@/lib/dungeon-maps";
+import { classColor } from "@/lib/classes";
 import { formatDuration } from "@/lib/format";
+import { wclPullUrl } from "@/lib/pulls";
 import type { DungeonPull, DungeonRoute as Route } from "@/lib/types";
 
 const FALLBACK_SIZE = { width: 1024, height: 683 };
@@ -29,11 +31,15 @@ function mapForFloor(route: Route, mapId: number): DungeonMap {
   };
 }
 
-function pullSummary(pull: DungeonPull): string {
-  return pull.enemies
-    .slice(0, 3)
-    .map((e) => (e.count > 1 ? `${e.name} ×${e.count}` : e.name))
-    .join(", ");
+/** Deaths in a pull grouped by player, in order of first death. */
+function deathCounts(pull: DungeonPull): { name: string; classId: number | null; count: number }[] {
+  const counts = new Map<string, { name: string; classId: number | null; count: number }>();
+  for (const d of pull.deaths) {
+    const entry = counts.get(d.name) ?? { name: d.name, classId: d.classId, count: 0 };
+    entry.count++;
+    counts.set(d.name, entry);
+  }
+  return [...counts.values()];
 }
 
 export default function DungeonRoute({ code, fightId }: { code: string; fightId: number }) {
@@ -41,6 +47,7 @@ export default function DungeonRoute({ code, fightId }: { code: string; fightId:
   const [error, setError] = useState<string | null>(null);
   const [selectedFloor, setSelectedFloor] = useState<number | null>(null);
   const [hovered, setHovered] = useState<number | null>(null);
+  const [expanded, setExpanded] = useState<ReadonlySet<number>>(new Set());
 
   useEffect(() => {
     let cancelled = false;
@@ -74,34 +81,107 @@ export default function DungeonRoute({ code, fightId }: { code: string; fightId:
     return { cx: fx * map!.width, cy: fy * map!.height };
   };
 
-  // Running enemy-forces total after each pull, for the list.
-  let running = 0;
-  const cumulative = route.pulls.map((p) => (running += p.forces));
-  const required = route.countRequired;
+  // Total time lost to deaths once each pull is done.
+  let lost = 0;
+  const lostAfter = route.pulls.map((p) => (lost = p.deaths.at(-1)?.timeLost ?? lost));
+
+  const toggle = (i: number) =>
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (!next.delete(i)) next.add(i);
+      return next;
+    });
 
   return (
-    <div className="route">
-      <ol className="pulls" onMouseLeave={() => setHovered(null)}>
-        {route.pulls.map((p, i) => (
-          <li
-            key={i}
-            className={`pull${hovered === i ? " pull-hovered" : ""}`}
-            onMouseEnter={() => setHovered(i)}
-          >
-            <span className="pull-number">{i + 1}</span>
-            <span className="pull-main">
-              <span className="pull-title">
-                {p.boss ? `Boss: ${p.name}` : pullSummary(p) || p.name}
-              </span>
-              <span className="pull-meta">
-                {formatDuration(p.startTime)} · {formatDuration(p.endTime - p.startTime)}
-                {p.forces > 0 && required
-                  ? ` · ~+${((p.forces / required) * 100).toFixed(1)}% (~${((cumulative[i] / required) * 100).toFixed(1)}%)`
-                  : ""}
-              </span>
-            </span>
+    <>
+    {route.players.length > 0 && (
+      <ul className="party" aria-label="Group members">
+        {route.players.map((pl) => (
+          <li key={pl.name} className="party-pill">
+            {pl.specIcon && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                className="spec-icon"
+                src={pl.specIcon}
+                alt=""
+                onError={(e) => (e.currentTarget.style.visibility = "hidden")}
+              />
+            )}
+            {pl.profileUrl ? (
+              <a
+                href={pl.profileUrl}
+                target="_blank"
+                rel="noreferrer"
+                title="Open on Raider.IO"
+                style={{ color: classColor(pl.classId) }}
+              >
+                {pl.name}
+              </a>
+            ) : (
+              <span style={{ color: classColor(pl.classId) }}>{pl.name}</span>
+            )}
           </li>
         ))}
+      </ul>
+    )}
+    <div className="route">
+      <ol className="pulls" onMouseLeave={() => setHovered(null)}>
+        {route.pulls.map((p, i) => {
+          const open = expanded.has(i);
+          const pullPenalty = p.deaths.reduce((sum, d) => sum + d.penalty, 0);
+          return (
+            <li
+              key={i}
+              className={`pull${hovered === i ? " pull-hovered" : ""}`}
+              onMouseEnter={() => setHovered(i)}
+            >
+              <button type="button" className="pull-head" aria-expanded={open} onClick={() => toggle(i)}>
+                <span className="pull-number">{i + 1}</span>
+                <span className="pull-main">
+                  <span className="pull-title">{p.boss ? `Boss: ${p.name}` : `Trash ${i + 1}`}</span>
+                  <span className="pull-meta">
+                    {formatDuration(p.startTime)} · {formatDuration(p.endTime - p.startTime)}
+                    {p.deaths.length > 0 && (
+                      <span className="pull-death"> · −{lostAfter[i] / 1000}s total</span>
+                    )}
+                  </span>
+                </span>
+              </button>
+              {open && (
+                <div className="pull-body">
+                  {p.enemies.length > 0 && (
+                    <ul className="pull-enemies">
+                      {p.enemies.map((e) => (
+                        <li key={e.npcId}>
+                          {e.count}× {e.name}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {p.deaths.length > 0 && (
+                    <p className="pull-death">
+                      {deathCounts(p).map((d, n) => (
+                        <span key={d.name}>
+                          {n > 0 && ", "}
+                          <span style={{ color: classColor(d.classId) }}>{d.name}</span> died
+                          {d.count > 1 && ` x${d.count}`}
+                        </span>
+                      ))}{" "}
+                      · −{pullPenalty / 1000}s
+                    </p>
+                  )}
+                  <a
+                    href={wclPullUrl(code, route.fightId, p.reportStart, p.reportEnd)}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Open on WarcraftLogs ↗
+                  </a>
+                </div>
+              )}
+            </li>
+          );
+        })}
       </ol>
 
       <div className="route-map">
@@ -179,5 +259,6 @@ export default function DungeonRoute({ code, fightId }: { code: string; fightId:
         )}
       </div>
     </div>
+    </>
   );
 }
